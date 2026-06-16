@@ -1,184 +1,125 @@
-import { useState } from 'react';
-import { base44 } from '@/api/base44Client';
-import { Link } from 'react-router-dom';
-import { Cloud, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
+import { base44 } from "@/api/base44Client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
+import AuthLayout from "@/components/AuthLayout";
+import GoogleIcon from "@/components/GoogleIcon";
 
 export default function Login() {
-  const [tab, setTab] = useState('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [otpStep, setOtpStep] = useState(false);
-  const [otp, setOtp] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
-    await base44.auth.loginViaEmailPassword(email, password);
-    window.location.href = '/';
-    setLoading(false);
-  };
-
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    setError('');
-    if (password !== confirmPassword) {
-      setError('パスワードが一致しません');
-      return;
+    try {
+      await base44.auth.loginViaEmailPassword(email, password);
+      window.location.href = "/";
+    } catch (err) {
+      setError(err.message || "Invalid email or password");
+    } finally {
+      setLoading(false);
     }
-    setLoading(true);
-    await base44.auth.register({ email, password });
-    setOtpStep(true);
-    setLoading(false);
   };
 
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    const res = await base44.auth.verifyOtp({ email, otpCode: otp });
-    base44.auth.setToken(res.access_token);
-    window.location.href = '/';
-    setLoading(false);
+  const handleGoogle = () => {
+    base44.auth.loginWithProvider("google", "/");
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
-      {/* Logo */}
-      <div className="flex flex-col items-center mb-8">
-        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg mb-3">
-          <Cloud className="w-8 h-8 text-white" />
+    <AuthLayout
+      icon={LogIn}
+      title="おかえりなさい"
+      subtitle="アカウントにログイン"
+      footer={
+        <>
+          アカウントをお持ちでない方は{" "}
+          <Link to="/register" className="text-primary font-medium hover:underline">
+            新規登録
+          </Link>
+        </>
+      }
+    >
+      <Button
+        variant="outline"
+        className="w-full h-12 text-sm font-medium mb-6"
+        onClick={handleGoogle}
+      >
+        <GoogleIcon className="w-5 h-5 mr-2" />
+        Googleで続ける
+      </Button>
+
+      <div className="relative mb-6">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-border" />
         </div>
-        <h1 className="font-heading font-bold text-3xl text-foreground">SoraNi</h1>
-        <p className="text-muted-foreground text-sm mt-1">空の写真だけを共有するSNS</p>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-card px-3 text-muted-foreground">または</span>
+        </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm">
-        {/* Tabs */}
-        {!otpStep && (
-          <div className="flex rounded-xl bg-muted p-1 mb-6">
-            {['login', 'register'].map((t) => (
-              <button
-                key={t}
-                onClick={() => { setTab(t); setError(''); }}
-                className={`flex-1 py-1.5 text-sm font-semibold rounded-lg transition-all ${
-                  tab === t ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground'
-                }`}
-              >
-                {t === 'login' ? 'ログイン' : '新規登録'}
-              </button>
-            ))}
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="email">メールアドレス</Label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              autoFocus
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="pl-10 h-12"
+              required
+            />
           </div>
-        )}
-
-        {/* OTP step */}
-        {otpStep ? (
-          <form onSubmit={handleVerifyOtp} className="space-y-4">
-            <p className="text-sm text-muted-foreground text-center mb-4">
-              {email} に確認コードを送信しました
-            </p>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">パスワード</Label>
+            <Link to="/forgot-password" className="text-xs text-primary hover:underline">
+              パスワードを忘れた方
+            </Link>
+          </div>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
-              type="text"
-              placeholder="確認コード"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              className="rounded-xl text-center text-lg tracking-widest"
-              maxLength={6}
-            />
-            {error && <p className="text-destructive text-xs text-center">{error}</p>}
-            <Button
-              type="submit"
-              disabled={loading || !otp}
-              className="w-full rounded-xl bg-primary text-primary-foreground font-semibold"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : '確認する'}
-            </Button>
-            <button
-              type="button"
-              className="w-full text-xs text-muted-foreground hover:text-primary transition-colors"
-              onClick={() => base44.auth.resendOtp(email)}
-            >
-              コードを再送する
-            </button>
-          </form>
-        ) : tab === 'login' ? (
-          <form onSubmit={handleLogin} className="space-y-4">
-            <Input
-              type="email"
-              placeholder="メールアドレス"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="rounded-xl"
-              required
-            />
-            <Input
+              id="password"
               type="password"
-              placeholder="パスワード"
+              autoComplete="current-password"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="rounded-xl"
+              className="pl-10 h-12"
               required
             />
-            {error && <p className="text-destructive text-xs">{error}</p>}
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-xl bg-primary text-primary-foreground font-semibold"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'ログイン'}
-            </Button>
-            <div className="text-center">
-              <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-primary transition-colors">
-                パスワードをお忘れですか？
-              </Link>
-            </div>
-          </form>
-        ) : (
-          <form onSubmit={handleRegister} className="space-y-4">
-            <Input
-              type="email"
-              placeholder="メールアドレス"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="rounded-xl"
-              required
-            />
-            <Input
-              type="password"
-              placeholder="パスワード"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="rounded-xl"
-              required
-            />
-            <Input
-              type="password"
-              placeholder="パスワード（確認）"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="rounded-xl"
-              required
-            />
-            {error && <p className="text-destructive text-xs">{error}</p>}
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-xl bg-primary text-primary-foreground font-semibold"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : '登録する'}
-            </Button>
-          </form>
-        )}
-      </div>
-
-      <Link to="/" className="mt-6 text-sm text-muted-foreground hover:text-primary transition-colors">
-        ← トップに戻る
-      </Link>
-    </div>
+          </div>
+        </div>
+        <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ログイン中...
+            </>
+          ) : (
+            "ログイン"
+          )}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

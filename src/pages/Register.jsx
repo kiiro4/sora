@@ -23,7 +23,7 @@ export default function Register() {
     e.preventDefault();
     setError("");
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError("パスワードが一致しません");
       return;
     }
     setLoading(true);
@@ -74,8 +74,8 @@ export default function Register() {
     return (
       <AuthLayout
         icon={Mail}
-        title="Verify your email"
-        subtitle={`We sent a code to ${email}`}
+        title="メール認証"
+        subtitle={`${email} に認証コードを送信しました`}
       >
         {error && (
           <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
@@ -108,16 +108,16 @@ export default function Register() {
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Verifying...
+              認証中...
             </>
           ) : (
-            "Verify"
+            "認証する"
           )}
         </Button>
         <p className="text-center text-sm text-muted-foreground mt-4">
-          Didn't receive the code?{" "}
+          コードが届かない場合は{" "}
           <button onClick={handleResend} className="text-primary font-medium hover:underline">
-            Resend
+            再送信
           </button>
         </p>
       </AuthLayout>
@@ -127,13 +127,13 @@ export default function Register() {
   return (
     <AuthLayout
       icon={UserPlus}
-      title="Create your account"
-      subtitle="Sign up to get started"
+      title="アカウント作成"
+      subtitle="SoraNiに登録して空の写真を共有しましょう"
       footer={
         <>
-          Already have an account?{" "}
+          すでにアカウントをお持ちの方は{" "}
           <Link to="/login" className="text-primary font-medium hover:underline">
-            Log in
+            ログイン
           </Link>
         </>
       }
@@ -144,7 +144,7 @@ export default function Register() {
         onClick={handleGoogle}
       >
         <GoogleIcon className="w-5 h-5 mr-2" />
-        Continue with Google
+        Googleで続ける
       </Button>
 
       <div className="relative mb-6">
@@ -152,7 +152,7 @@ export default function Register() {
           <div className="w-full border-t border-border" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-3 text-muted-foreground">or</span>
+          <span className="bg-card px-3 text-muted-foreground">または</span>
         </div>
       </div>
 
@@ -164,7 +164,7 @@ export default function Register() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">メールアドレス</Label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
@@ -181,7 +181,7 @@ export default function Register() {
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">パスワード</Label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
@@ -197,7 +197,7 @@ export default function Register() {
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="confirm">Confirm Password</Label>
+          <Label htmlFor="confirm">パスワード（確認）</Label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
@@ -216,10 +216,10 @@ export default function Register() {
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Creating account...
+              作成中...
             </>
           ) : (
-            "Create account"
+            "アカウントを作成"
           )}
         </Button>
       </form>

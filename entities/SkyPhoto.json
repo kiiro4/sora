@@ -4,15 +4,53 @@
   "properties": {
     "image_url": {
       "type": "string",
-      "description": "URL of the uploaded sky photo"
+      "description": "\u5199\u771f\u306eURL"
     },
-    "uploader_user_id": {
+    "author_name": {
       "type": "string",
-      "description": "ID of the user who uploaded the photo"
+      "description": "\u6295\u7a3f\u8005\u540d"
+    },
+    "author_nickname": {
+      "type": "string",
+      "description": "\u6295\u7a3f\u8005\u306e\u3042\u3060\u540d"
+    },
+    "author_avatar_url": {
+      "type": "string",
+      "description": "\u6295\u7a3f\u8005\u306e\u30a2\u30d0\u30bf\u30fc\u753b\u50cfURL"
+    },
+    "location_name": {
+      "type": "string",
+      "description": "\u64ae\u5f71\u5834\u6240\uff08\u5730\u540d\uff09"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "\u7def\u5ea6"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "\u7d4c\u5ea6"
+    },
+    "ai_checked": {
+      "type": "boolean",
+      "default": false,
+      "description": "AI\u30c1\u30a7\u30c3\u30af\u6e08\u307f\u304b"
+    },
+    "ai_passed": {
+      "type": "boolean",
+      "default": false,
+      "description": "AI\u3067\u7a7a\u3068\u5224\u5b9a\u3055\u308c\u305f\u304b"
+    },
+    "ai_deleted": {
+      "type": "boolean",
+      "default": false,
+      "description": "AI\u306b\u3088\u308a\u524a\u9664\u3055\u308c\u305f\uff08\u901a\u77e5\u7528\u30d5\u30e9\u30b0\uff09"
+    },
+    "deleted_image_thumb": {
+      "type": "string",
+      "description": "\u524a\u9664\u3055\u308c\u305f\u5199\u771f\u306e\u30b5\u30e0\u30cdURL\uff08\u901a\u77e5\u8868\u793a\u7528\uff09"
     }
   },
   "required": [
-    "image_url",
-    "uploader_user_id"
+    "image_url"
   ]
 }

@@ -1,75 +1,114 @@
-import { useState } from 'react';
-import { base44 } from '@/api/base44Client';
-import { Link } from 'react-router-dom';
-import { Cloud, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import React, { useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { base44 } from "@/api/base44Client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Lock, Loader2, AlertTriangle } from "lucide-react";
+import AuthLayout from "@/components/AuthLayout";
 
 export default function ResetPassword() {
-  const params = new URLSearchParams(window.location.search);
-  const resetToken = params.get('token');
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
+  const [searchParams] = useSearchParams();
+  const resetToken = searchParams.get("token");
+
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [done, setDone] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    if (password !== confirm) {
-      setError('パスワードが一致しません');
+    setError("");
+    if (newPassword !== confirmPassword) {
+      setError("パスワードが一致しません");
       return;
     }
     setLoading(true);
-    await base44.auth.resetPassword({ resetToken, newPassword: password });
-    setDone(true);
-    setLoading(false);
-    window.location.href = '/login';
+    try {
+      await base44.auth.resetPassword({ resetToken, newPassword });
+      window.location.href = "/login";
+    } catch (err) {
+      setError(err.message || "Failed to reset password");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
-      <div className="flex flex-col items-center mb-8">
-        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg mb-3">
-          <Cloud className="w-8 h-8 text-white" />
-        </div>
-        <h1 className="font-heading font-bold text-3xl text-foreground">SoraNi</h1>
-      </div>
+  if (!resetToken) {
+    return (
+      <AuthLayout
+        icon={AlertTriangle}
+        title="無効なリンク"
+        subtitle="このパスワードリセットリンクは無効です"
+        footer={
+          <Link to="/forgot-password" className="text-primary font-medium hover:underline">
+            新しいリンクをリクエスト
+          </Link>
+        }
+      >
+        <p className="text-sm text-foreground text-center">
+          使用されたリンクが不完全なようです。新しいパスワードリセットメールをリクエストしてください。
+        </p>
+      </AuthLayout>
+    );
+  }
 
-      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm">
-        <h2 className="font-heading font-bold text-xl text-foreground mb-4">新しいパスワード</h2>
-        {done ? (
-          <p className="text-sm text-muted-foreground text-center">パスワードを変更しました</p>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+  return (
+    <AuthLayout
+      icon={Lock}
+      title="新しいパスワード"
+      subtitle="新しいパスワードを入力してください"
+    >
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+          {error}
+        </div>
+      )}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="password">新しいパスワード</Label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
+              id="password"
               type="password"
-              placeholder="新しいパスワード"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="rounded-xl"
+              autoComplete="new-password"
+              autoFocus
+              placeholder="••••••••"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="pl-10 h-12"
               required
             />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="confirm">パスワード（確認）</Label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
+              id="confirm"
               type="password"
-              placeholder="パスワード（確認）"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              className="rounded-xl"
+              autoComplete="new-password"
+              placeholder="••••••••"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="pl-10 h-12"
               required
             />
-            {error && <p className="text-destructive text-xs">{error}</p>}
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-xl bg-primary text-primary-foreground font-semibold"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : '変更する'}
-            </Button>
-          </form>
-        )}
-      </div>
-    </div>
+          </div>
+        </div>
+        <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              リセット中...
+            </>
+          ) : (
+            "パスワードをリセット"
+          )}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

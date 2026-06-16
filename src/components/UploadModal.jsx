@@ -1,172 +1,245 @@
-import { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Upload, ImagePlus, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { base44 } from '@/api/base44Client';
+import React, { useState, useRef, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Camera, Loader2, X, MapPin, MapPinOff } from "lucide-react";
 
-const SkyCheckStatus = ({ status, message }) => {
-  if (status === 'checking') return (
-    <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted rounded-xl px-4 py-2.5 mt-3">
-      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-      <span>AIが空の写真かチェック中…</span>
-    </div>
-  );
-  if (status === 'pass') return (
-    <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 mt-3">
-      <CheckCircle2 className="w-4 h-4 shrink-0" />
-      <span>{message}</span>
-    </div>
-  );
-  if (status === 'fail') return (
-    <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 mt-3">
-      <AlertTriangle className="w-4 h-4 shrink-0" />
-      <span>{message}</span>
-    </div>
-  );
-  return null;
-};
-
-export default function UploadModal({ onClose, onUploaded }) {
+export default function UploadModal({ open, onClose, onSuccess, user }) {
+  const [capturedFile, setCapturedFile] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [skyCheck, setSkyCheck] = useState({ status: null, message: '', passed: false });
-  const inputRef = useRef();
+  const [locationChoice, setLocationChoice] = useState(null); // null | "ask" | "granted" | "denied"
+  const [coords, setCoords] = useState(null);
+  const [locationName, setLocationName] = useState(null);
+  const cameraInputRef = useRef(null);
 
-  const handleFileChange = async (f) => {
-    if (!f) return;
-    setFile(f);
-    setSkyCheck({ status: null, message: '', passed: false });
-    const reader = new FileReader();
-    reader.onload = (ev) => setPreview(ev.target.result);
-    reader.readAsDataURL(f);
-
-    // Upload for AI check
-    setSkyCheck({ status: 'checking', message: '', passed: false });
-    const { file_url } = await base44.integrations.Core.UploadFile({ file: f });
-
-    const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `この画像を見て、「空（そら）が主役の写真」かどうかを判定してください。
-空が写っていれば（どんな天気でも可：青空、曇り、夕焼け、星空など）OKとします。
-地面や建物が主役の写真、空が全く写っていない写真はNGです。
-JSONで返してください。`,
-      file_urls: [file_url],
-      response_json_schema: {
-        type: 'object',
-        properties: {
-          is_sky: { type: 'boolean' },
-          reason: { type: 'string' },
-        },
-      },
-    });
-
-    if (result.is_sky) {
-      setSkyCheck({ status: 'pass', message: `✓ ${result.reason}`, passed: true, uploadedUrl: file_url });
-    } else {
-      setSkyCheck({ status: 'fail', message: `空の写真ではないようです。${result.reason}`, passed: false });
+  // Reset when modal opens
+  useEffect(() => {
+    if (open) {
+      setCapturedFile(null);
+      setPreview(null);
+      setUploading(false);
+      setLocationChoice(null);
+      setCoords(null);
+      setLocationName(null);
     }
+  }, [open]);
+
+  const handleCapture = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCapturedFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setPreview(reader.result);
+    reader.readAsDataURL(file);
+    // Ask location after capture
+    setLocationChoice("ask");
   };
 
-  const handleInputChange = (e) => handleFileChange(e.target.files[0]);
+  const handleLocationAllow = () => {
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        setCoords({ lat, lon });
+        // Reverse geocode via nominatim
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=ja`
+          );
+          const data = await res.json();
+          const city =
+            data.address?.city ||
+            data.address?.town ||
+            data.address?.village ||
+            data.address?.state ||
+            "";
+          setLocationName(city);
+        } catch {
+          setLocationName(null);
+        }
+        setLocationChoice("granted");
+      },
+      () => setLocationChoice("denied")
+    );
+  };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const f = e.dataTransfer.files[0];
-    if (!f || !f.type.startsWith('image/')) return;
-    handleFileChange(f);
+  const handleLocationDeny = () => {
+    setLocationChoice("denied");
   };
 
   const handleSubmit = async () => {
-    if (!file || !skyCheck.passed) return;
+    if (!capturedFile) return;
     setUploading(true);
-    const user = await base44.auth.me();
-    const imageUrl = skyCheck.uploadedUrl || (await base44.integrations.Core.UploadFile({ file })).file_url;
-    await base44.entities.SkyPhoto.create({
-      image_url: imageUrl,
-      uploader_user_id: user.id,
-    });
+
+    const { file_url } = await base44.integrations.Core.UploadFile({ file: capturedFile });
+
+    const photoData = {
+      image_url: file_url,
+      author_name: user?.nickname || user?.full_name || user?.email || "匿名",
+      author_nickname: user?.nickname || null,
+      author_avatar_url: user?.avatar_url || null,
+      ai_checked: false,
+      ai_passed: false,
+    };
+    if (coords) {
+      photoData.latitude = coords.lat;
+      photoData.longitude = coords.lon;
+    }
+    if (locationName) {
+      photoData.location_name = locationName;
+    }
+
+    const created = await base44.entities.SkyPhoto.create(photoData);
+
+    // Run AI check in background (non-blocking for UX)
+    runAiCheck(created.id, file_url, user?.email);
+
     setUploading(false);
-    onUploaded();
+    onSuccess();
     onClose();
   };
 
-  const canSubmit = file && skyCheck.passed && !uploading && skyCheck.status !== 'checking';
+  const runAiCheck = async (photoId, imageUrl, userEmail) => {
+    try {
+      const result = await base44.integrations.Core.InvokeLLM({
+        prompt: "この画像は空（sky）の写真ですか？空、雲、夕焼け、星空、朝焼けなど空が主役の写真であればis_sky=trueとしてください。建物、人物、食べ物、動物など空が主役でない場合はfalseとしてください。",
+        file_urls: [imageUrl],
+        response_json_schema: {
+          type: "object",
+          properties: {
+            is_sky: { type: "boolean" },
+            reason: { type: "string" }
+          }
+        }
+      });
+
+      if (result.is_sky) {
+        await base44.entities.SkyPhoto.update(photoId, { ai_checked: true, ai_passed: true });
+      } else {
+        // Mark as ai_deleted for notification, then delete
+        await base44.entities.SkyPhoto.update(photoId, {
+          ai_checked: true,
+          ai_passed: false,
+          ai_deleted: true,
+          deleted_image_thumb: imageUrl,
+        });
+        // Delete after short delay so user can see notification
+        setTimeout(async () => {
+          await base44.entities.SkyPhoto.delete(photoId);
+        }, 30000);
+      }
+    } catch (e) {
+      console.error("AI check failed", e);
+    }
+  };
+
+  const readyToPost = capturedFile && (locationChoice === "granted" || locationChoice === "denied");
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ scale: 0.93, opacity: 0, y: 20 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.93, opacity: 0, y: 20 }}
-          transition={{ duration: 0.28, type: 'spring', stiffness: 300, damping: 28 }}
-          className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="font-heading font-bold text-xl text-foreground">空の写真を投稿</h2>
-            <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 font-heading">
+            <Camera className="w-5 h-5 text-primary" />
+            空の写真を撮影して投稿
+          </DialogTitle>
+        </DialogHeader>
 
-          {!preview ? (
-            <div
-              className="border-2 border-dashed border-primary/30 rounded-2xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-primary/60 hover:bg-primary/5 transition-all"
-              onClick={() => inputRef.current.click()}
-              onDrop={handleDrop}
-              onDragOver={(e) => e.preventDefault()}
-            >
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/15 to-accent/30 flex items-center justify-center">
-                <ImagePlus className="w-7 h-7 text-primary" />
-              </div>
-              <p className="text-sm font-body text-muted-foreground text-center">
-                クリックまたはドラッグ＆ドロップ<br />
-                <span className="text-xs">JPG, PNG, WEBP など</span>
+        <div className="space-y-4 mt-2">
+          {!capturedFile ? (
+            <div>
+              <p className="text-sm text-muted-foreground mb-4 text-center">
+                カメラで今この瞬間の空を撮影して投稿しましょう
               </p>
+              <Button
+                className="w-full h-14 rounded-xl gap-2 text-base font-medium shadow-md shadow-primary/20"
+                onClick={() => cameraInputRef.current?.click()}
+              >
+                <Camera className="w-5 h-5" />
+                カメラを起動する
+              </Button>
               <input
-                ref={inputRef}
+                ref={cameraInputRef}
                 type="file"
                 accept="image/*"
+                capture="environment"
                 className="hidden"
-                onChange={handleInputChange}
+                onChange={handleCapture}
               />
             </div>
           ) : (
-            <div className="relative rounded-2xl overflow-hidden aspect-square">
-              <img src={preview} alt="プレビュー" className="w-full h-full object-cover" />
-              <button
-                className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1.5 hover:bg-black/70 transition-colors"
-                onClick={() => { setPreview(null); setFile(null); setSkyCheck({ status: null, message: '', passed: false }); }}
-              >
-                <X className="w-4 h-4" />
-              </button>
+            <div className="space-y-4">
+              <div className="relative rounded-2xl overflow-hidden">
+                <img
+                  src={preview}
+                  alt="撮影した写真"
+                  className="w-full aspect-square object-cover"
+                />
+                <button
+                  onClick={() => { setCapturedFile(null); setPreview(null); setLocationChoice(null); setCoords(null); setLocationName(null); }}
+                  className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                {locationName && (
+                  <div className="absolute bottom-3 left-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-sm text-white text-xs">
+                    <MapPin className="w-3 h-3" />
+                    {locationName}
+                  </div>
+                )}
+              </div>
+
+              {/* Location ask */}
+              {locationChoice === "ask" && (
+                <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 space-y-3">
+                  <p className="text-sm font-medium text-foreground text-center">
+                    📍 位置情報を付与しますか？
+                  </p>
+                  <p className="text-xs text-muted-foreground text-center">撮影場所の地名が写真に表示されます</p>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="flex-1" onClick={handleLocationAllow}>
+                      <MapPin className="w-3.5 h-3.5 mr-1" /> 許可する
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1" onClick={handleLocationDeny}>
+                      <MapPinOff className="w-3.5 h-3.5 mr-1" /> 許可しない
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {locationChoice === "granted" && (
+                <div className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1">
+                  <MapPin className="w-3 h-3 text-primary" />
+                  {locationName ? `${locationName}の位置情報を付与します` : "位置情報を取得しました"}
+                </div>
+              )}
+
+              {readyToPost && (
+                <Button
+                  onClick={handleSubmit}
+                  disabled={uploading}
+                  className="w-full h-12 rounded-xl font-medium shadow-md shadow-primary/20"
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      投稿中...
+                    </>
+                  ) : (
+                    "投稿する"
+                  )}
+                </Button>
+              )}
             </div>
           )}
-
-          <SkyCheckStatus status={skyCheck.status} message={skyCheck.message} />
-
-          <Button
-            className="w-full mt-4 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold gap-2 shadow-md shadow-primary/20 transition-all hover:shadow-lg hover:shadow-primary/30 disabled:opacity-50"
-            disabled={!canSubmit}
-            onClick={handleSubmit}
-          >
-            {uploading ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> アップロード中…</>
-            ) : skyCheck.status === 'checking' ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> AIチェック中…</>
-            ) : (
-              <><Upload className="w-4 h-4" /> 投稿する</>
-            )}
-          </Button>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
